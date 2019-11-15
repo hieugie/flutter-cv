@@ -17,9 +17,11 @@ class ExpDetail extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                expItem.position,
-                style: EXP_POSITION,
+              Material(
+                child: Text(
+                  expItem.position,
+                  style: EXP_POSITION,
+                ),
               ),
 //              Padding(
 //                padding: const EdgeInsets.only(top: 4.0),
