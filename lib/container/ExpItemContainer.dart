@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:hieugiecv/model/ExpItem.dart';
 import 'package:hieugiecv/provider/IndexProvider.dart';
 import 'package:hieugiecv/screen/ExpDetail.dart';
 import 'package:hieugiecv/style/TextStyle.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 
 class ExpItemContainer extends StatefulWidget {
   @override
@@ -13,51 +16,44 @@ class ExpItemContainer extends StatefulWidget {
 }
 
 class ExpItemContainerState extends State<ExpItemContainer> {
-  List<ExpItem> expItems;
+  Future<List<ExpItem>> expItems;
 
   PageController _pageController;
+
+  Future<List<ExpItem>> fetchPost() async {
+    final response =
+    await http.get('https://us-central1-hieugiecv-express.cloudfunctions.net/app/api/p/exp');
+
+    if (response.statusCode == 200) {
+      // If server returns an OK response, parse the JSON.
+//      return ExpItem.fromJson(json.decode(response.body));
+      print(response.body);
+
+      var list = json.decode(response.body) as List;
+      List<ExpItem> itemsList = list.map((i) => ExpItem.fromJson(i)).toList();
+      return itemsList;
+    } else {
+      // If that response was not OK, throw an error.
+      throw Exception('Failed to load post');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _pageController = new PageController(initialPage: 0, viewportFraction: 0.8);
-    expItems = [
-      new ExpItem(
-          1,
-          'Project manager',
-          'Softdreams.vn',
-          '02/2018',
-          'Now',
-          'Currently, my team and i are developing an application for Credit information center of vietnam(https://cic.org.vn/) to connect debit customers and credit org together to solve the problem of black credit.\nMy first time standing in PM position, so i have many things to learn, but it\'s time to me improve myself.\nFrom the beginning of PM to now, it\'s not as hard as i thought, main reason is i have many supports from my team, from my cool boss.',
-          ['angular', 'spring', 'html', 'hibernate', 'sql'],
-          'Loan customer\'s infomation gateway'),
-      new ExpItem(
-          2,
-          'Developer',
-          'FSoft',
-          '12/2017',
-          '02/2018',
-          'Currently, my team and i are developing an application for Credit information center of vietnam(https://cic.org.vn/) to connect debit customers and credit org together to solve the problem of black credit.\nMy first time standing in PM position, so i have many things to learn, but it\'s time to me improve myself.\nFrom the beginning of PM to now, it\'s not as hard as i thought, main reason is i have many supports from my team, from my cool boss.',
-          ['react'],
-          'HP product'),
-      new ExpItem(
-          3,
-          'Developer',
-          'Tecapro.com.vn',
-          '11/2015',
-          '12/2017',
-          'Currently, my team and i are developing an application for Credit information center of vietnam(https://cic.org.vn/) to connect debit customers and credit org together to solve the problem of black credit.\nMy first time standing in PM position, so i have many things to learn, but it\'s time to me improve myself.\nFrom the beginning of PM to now, it\'s not as hard as i thought, main reason is i have many supports from my team, from my cool boss.',
-          ['angular', 'spring', 'html', 'hibernate', 'sql'],
-          'Social insurence of Vietnam')
-    ];
+    expItems = fetchPost();
   }
 
 
-  Widget _expSelector(index) {
+  Widget _expSelector(expItem, index) {
     List<Widget> list = new List<Widget>();
-    for (var i = 0; i < expItems[index].frameWork.length; i++) {
-      list.add(frameworkIcon(expItems[index].frameWork, i));
+    if (expItem.framework != null) {
+      for (var i = 0; i < expItem.framework.length; i++) {
+        list.add(frameworkIcon(expItem.framework, i));
+      }
     }
+
     final index2 = Provider.of<IndexProvider>(context);
     return Container(
       child: AnimatedBuilder(
@@ -74,7 +70,7 @@ class ExpItemContainerState extends State<ExpItemContainer> {
             }
             return Center(
               child: SizedBox(
-                height: Curves.easeInOut.transform(value) * 280.0,
+                height: Curves.easeInOut.transform(value) * 320.0,
                 width: Curves.easeInOut.transform(value) * 350.0,
                 child: widget,
               ),
@@ -89,23 +85,23 @@ class ExpItemContainerState extends State<ExpItemContainer> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
                   Hero(
-                    tag: 'card${expItems[index].id}',
+                    tag: 'card${expItem.id}',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          expItems[index].position,
+                          expItem.position,
                           style: EXP_POSITION,
                         ),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              expItems[index].fromDate,
+                              expItem.fromDate,
                               style: EXP_TODATE,
                             ),
                             Text(
-                              ' - ' + expItems[index].toDate,
+                              ' - ' + expItem.toDate,
                               style: EXP_TODATE,
                             ),
                           ],
@@ -129,7 +125,7 @@ class ExpItemContainerState extends State<ExpItemContainer> {
                               ),
                             ),
                             Text(
-                              expItems[index].company,
+                              expItem.companyName,
                               style: EXP_COMPANY,
                             ),
                           ],
@@ -149,7 +145,7 @@ class ExpItemContainerState extends State<ExpItemContainer> {
                             ),
                             Flexible(
                               child: Text(
-                                expItems[index].project,
+                                expItem.project,
                                 style: EXP_DESCRIPTION,
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -194,16 +190,29 @@ class ExpItemContainerState extends State<ExpItemContainer> {
   @override
   Widget build(BuildContext context) {
     final indexProvider = Provider.of<IndexProvider>(context);
-    return PageView.builder(
-      onPageChanged: (index) => indexProvider.changeIndex(index),
-      itemCount: expItems.length,
-      controller: _pageController,
-      itemBuilder: (BuildContext context, int index) {
-        return GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExpDetail(expItems[index]))),
-          child: _expSelector(index),
-        );
+    return FutureBuilder<List<ExpItem>>(
+      future: expItems,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return PageView.builder(
+            onPageChanged: (index) => indexProvider.changeIndex(index),
+            controller: _pageController,
+            itemCount: snapshot.data.length,
+            itemBuilder: (BuildContext context, int index) {
+              return GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExpDetail(snapshot.data[index]))),
+                child: _expSelector(snapshot.data[index], index),
+              );
+
+            },
+          );
+        } else if (snapshot.hasError) {
+          return Text("${snapshot.error}");
+        }
+        // By default, show a loading spinner.
+        return CircularProgressIndicator();
       },
     );
+
   }
 }
